@@ -1,0 +1,36 @@
+FROM ruby:3.2.6-alpine AS base
+RUN apk add --update --no-cache git mysql-dev
+
+FROM base AS builder
+RUN apk add --update --no-cache build-base; gem update --system 3.5.22
+WORKDIR /app
+COPY ["Gemfile", "Gemfile.lock", "./"]
+RUN bundle check || bundle install --jobs $(nproc) --retry 2 && rm -rf /usr/local/bundle/cache
+
+FROM base AS final
+ARG APPNAME
+ENV APPNAME=${APPNAME:-webscraping_service}
+ENV DOCKERIZE_VERSION v0.8.0
+RUN apk update --no-cache \
+    && apk add --no-cache wget openssl \
+    && wget -O - https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz | tar xzf - -C /usr/local/bin \
+    && apk del wget
+RUN apk add --update --no-cache openssh tzdata && rm -rf /tmp/* /var/tmp/*
+
+# Setting up new user
+ARG USER_UID=1000
+ARG USER_GID=1000
+ENV USER=rails
+RUN addgroup --gid $USER_GID $USER && adduser --uid $USER_UID -G $USER -D $USER
+WORKDIR /home/$USER/$APPNAME
+
+COPY --chown=$USER:$USER --from=builder /usr/local/bundle /usr/local/bundle
+VOLUME [ "/usr/local/bundle" ]
+COPY --chown=$USER:$USER ./docker/docker-entrypoint.sh /usr/local/bin
+COPY --chown=$USER:$USER . .
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["docker-entrypoint.sh"]
+USER $USER
+EXPOSE 3000
+CMD ["bin/rails", "server", "--port", "3000", "--binding", "0.0.0.0"]

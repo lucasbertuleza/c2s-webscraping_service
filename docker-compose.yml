@@ -1,0 +1,45 @@
+services:
+  app:
+    build:
+      context: ./
+      dockerfile: ./docker/Dockerfile.dev
+      args:
+        - APPNAME=${COMPOSE_PROJECT_NAME}
+    image: lucasbertuleza/${COMPOSE_PROJECT_NAME}_app
+    container_name: ${COMPOSE_PROJECT_NAME}_app
+    entrypoint: dockerize -wait tcp://database:3306 -timeout 30s docker-entrypoint.sh
+    command: ash -c "rm -f tmp/pids/server.pid && bin/rails server --port 3000 --binding 0.0.0.0"
+    working_dir: /home/rails/${COMPOSE_PROJECT_NAME}
+    volumes:
+      - .:/home/rails/${COMPOSE_PROJECT_NAME}
+      - bundle_cache:/usr/local/bundle
+    ports:
+      - 3000:3000
+    env_file: .env
+    depends_on:
+      - database
+    stdin_open: true
+    tty: true
+    networks:
+      - net
+
+  database:
+    image: mysql:9.1.0
+    container_name: ${COMPOSE_PROJECT_NAME}_database
+    command: --max_allowed_packet=128M
+    tty: true
+    restart: on-failure
+    volumes:
+      - mysql_data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DATABASE_PASSWORD}
+    mem_limit: 512m
+    networks:
+      - net
+
+volumes:
+  bundle_cache:
+  mysql_data:
+
+networks:
+  net:
