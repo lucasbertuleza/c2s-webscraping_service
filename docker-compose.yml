@@ -7,7 +7,7 @@ services:
         - APPNAME=${COMPOSE_PROJECT_NAME}
     image: lucasbertuleza/${COMPOSE_PROJECT_NAME}_app
     container_name: ${COMPOSE_PROJECT_NAME}_app
-    entrypoint: dockerize -wait tcp://database:3306 -wait tcp://redis:6379 -timeout 30s docker-entrypoint.sh
+    entrypoint: dockerize -wait tcp://database:3306 -wait tcp://redis:6379 -wait tcp://selenium:4444 -timeout 30s docker-entrypoint.sh
     command: ash -c "rm -f tmp/pids/server.pid && bin/rails server --port 3000 --binding 0.0.0.0"
     working_dir: /home/rails/${COMPOSE_PROJECT_NAME}
     volumes:
@@ -46,6 +46,13 @@ services:
     volumes:
       - "redis_data:/data:delegated"
     mem_limit: 128m
+    networks:
+      - net
+
+  selenium:
+    image: selenium/standalone-chrome:latest
+    container_name: ${COMPOSE_PROJECT_NAME}_selenium_chrome
+    shm_size: 2g
     networks:
       - net
 

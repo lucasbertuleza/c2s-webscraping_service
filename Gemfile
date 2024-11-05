@@ -89,3 +89,5 @@ group :test do
   # https://github.com/simplecov-ruby/simplecov
   gem "simplecov", require: false
 end
+
+gem "selenium-webdriver", "~> 4.26"
