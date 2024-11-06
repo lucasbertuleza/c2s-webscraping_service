@@ -3,12 +3,14 @@ module Scraping
   class WebmotorsService < Base
     # @return [Hash<Symbol,String>]
     def call(_)
+      sleep(3) # carregar JS
+
       begin
-        preco = driver.find_element(:css, "strong#vehicleSendProposalPrice").text
         descricao = driver.find_element(:css, "h1#VehicleBasicInformationTitle")
         modelo = descricao.find_element(tag_name: "strong").text
         info = descricao.find_element(tag_name: "span").text
         marca = descricao.text.gsub(/#{modelo}|#{info}/, "").strip
+        preco = driver.find_element(:css, "strong#vehicleSendProposalPrice").text
       rescue Selenium::WebDriver::Error::NoSuchElementError
         raise(VerificacaoCaptchaException) if captcha?
       ensure
