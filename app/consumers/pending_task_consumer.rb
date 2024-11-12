@@ -12,9 +12,9 @@ class PendingTaskConsumer
   queue_name "pending_tasks"
 
   # @param message [Hutch::Message]
-  # Exemplo de payload {task_id:, url:}
+  # Exemplo de payload {task_id:, url:, user:}
   def process(message)
-    publicar_inicio_do_processamento(task_id: message[:task_id])
+    publicar_inicio_do_processamento(task_id: message[:task_id], user: message[:user])
 
     sleep(rand(10..20)) # tempo ocioso entre as extrações
 
@@ -23,9 +23,9 @@ class PendingTaskConsumer
     begin
       dados_coletados.merge! Scraping::WebmotorsService.call(url: message[:url])
       Task.find_or_create_by!(uuid: message[:task_id]).update!(data: dados_coletados)
-      notificar_concluido_com_sucesso(task_id: message[:task_id], data: dados_coletados)
+      notificar_concluido_com_sucesso(task_id: message[:task_id], data: dados_coletados, user: message[:user])
     rescue => error
-      notificar_falha(task_id: message[:task_id], error: error.message, data: dados_coletados)
+      notificar_falha(task_id: message[:task_id], error: error.message, data: dados_coletados, user: message[:user])
     end
   end
 
@@ -34,23 +34,23 @@ class PendingTaskConsumer
   # Publica diretamente na fila do RabbitMQ
   #
   # @param task_id [String]
-  def publicar_inicio_do_processamento(task_id:)
+  def publicar_inicio_do_processamento(task_id:, user:)
     Hutch.connect
-    Hutch.publish("scraper.task.progress", task_id:, status: "processing")
+    Hutch.publish("scraper.task.progress", task_id:, user:)
   end
 
   # Notifica via API e publica na fila do RabbitMQ
   #
   # @param task_id [String]
   # @param data [Hash]
-  def notificar_concluido_com_sucesso(task_id:, data:)
+  def notificar_concluido_com_sucesso(task_id:, data:, user:)
     payload = {
       task: {action: "update", uuid: task_id},
       notification: {info: "Tarefa concluída", data:}
     }
 
     send_notification_request(payload) do
-      Hutch.publish("scraper.task.success", task_id:, data:)
+      Hutch.publish("scraper.task.success", task_id:, data:, user:)
     end
   end
 
@@ -58,14 +58,14 @@ class PendingTaskConsumer
   #
   # @param task_id [String]
   # @param message [String]
-  def notificar_falha(task_id:, error:, data:)
+  def notificar_falha(task_id:, error:, data:, user:)
     payload = {
       task: {action: "update", uuid: task_id},
       notification: {info: error, data:}
     }
 
     send_notification_request(payload) do
-      Hutch.publish("scraper.task.failed", task_id:, error:, data:)
+      Hutch.publish("scraper.task.failed", task_id:, error:, data:, user:)
     end
   end
 
